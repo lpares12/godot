@@ -218,6 +218,14 @@
 				Adds a [code][table=columns][/code] tag to the tag stack.
 			</description>
 		</method>
+		<method name="push_furigana">
+			<return type="void" />
+			<argument index="0" name="text" type="String" />
+			<argument index="1" name="furigana" type="String" />
+			<description>
+				Adds a [code][furigana=furigana]text[/furigana][/code] tag to the tag stack.
+			</description>
+		</method>
 		<method name="push_underline">
 			<return type="void" />
 			<description>
@@ -395,6 +403,8 @@
 		</constant>
 		<constant name="ITEM_META" value="17" enum="ItemType">
 		</constant>
+		<constant name="ITEM_FURIGANA" value="19" enum="ItemType">
+		</constant>
 	</constants>
 	<theme_items>
 		<theme_item name="default_color" data_type="color" type="Color" default="Color( 1, 1, 1, 1 )">
@@ -438,6 +448,9 @@
 		</theme_item>
 		<theme_item name="mono_font" data_type="font" type="Font">
 			The font used for monospace text.
+		</theme_item>
+		<theme_item name="furigana_font" data_type="font" type="Font">
+			The font used for furigana text.
 		</theme_item>
 		<theme_item name="normal_font" data_type="font" type="Font">
 			The default text font.

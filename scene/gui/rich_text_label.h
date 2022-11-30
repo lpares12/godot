@@ -75,6 +75,7 @@ public:
 		ITEM_INDENT,
 		ITEM_LIST,
 		ITEM_TABLE,
+		ITEM_FURIGANA,
 		ITEM_FADE,
 		ITEM_SHAKE,
 		ITEM_WAVE,
@@ -223,6 +224,13 @@ private:
 		int length;
 
 		ItemFade() { type = ITEM_FADE; }
+	};
+
+	struct ItemFurigana : public Item {
+		String text;
+		String furigana;
+
+		ItemFurigana() { type = ITEM_FURIGANA; }
 	};
 
 	struct ItemFX : public Item {
@@ -436,6 +444,7 @@ public:
 	void push_list(ListType p_list);
 	void push_meta(const Variant &p_meta);
 	void push_table(int p_columns);
+	void push_furigana(String text, String furigana);
 	void push_fade(int p_start_index, int p_length);
 	void push_shake(int p_strength, float p_rate);
 	void push_wave(float p_frequency, float p_amplitude);

@@ -45,6 +45,9 @@
 #include "modules/regex/regex.h"
 #endif
 
+#include <iostream>
+#include <ostream>
+
 RichTextLabel::Item *RichTextLabel::_get_next_item(Item *p_item, bool p_free) {
 	if (p_free) {
 		if (p_item->subitems.size()) {
@@ -708,6 +711,117 @@ int RichTextLabel::_process_line(ItemFrame *p_frame, const Vector2 &p_ofs, int &
 				ADVANCE(img->size.width);
 				CHECK_HEIGHT((img->size.height + font->get_descent()));
 
+			} break;
+			case ITEM_FURIGANA: {
+				lh = 0;
+				ItemFurigana *furi = static_cast<ItemFurigana *>(it);
+
+				Ref<Font> font = _find_font(it);
+				if (font.is_null()) {
+					font = p_base_font;
+				}
+				FontDrawer drawer(font, Color(1, 1, 1));
+
+				Ref<Font> furigana_font = get_font("furigana_font");
+				if (furigana_font.is_null()) {
+					furigana_font = p_base_font;
+				}
+				FontDrawer furigana_drawer(furigana_font, Color(1, 1, 1));
+
+				int ascent = font->get_ascent();
+				int descent = font->get_descent();
+				int furigana_ascent = furigana_font->get_ascent();
+				int furigana_descent = furigana_font->get_descent();
+
+				Color color;
+				if (p_mode == PROCESS_DRAW) {
+					color = _find_color(furi, p_base_color);
+				}
+
+				if (p_mode != PROCESS_CACHE) {
+					lh = line < l.height_caches.size() ? l.height_caches[line] : 1;
+				}
+
+				if (p_mode == PROCESS_CACHE) {
+					l.char_count += furi->text.length();
+				}
+
+				float text_size = 0.0f;
+
+				const CharType *c = furi->text.c_str();
+				int index = 0;
+				int nChars = 0;
+				while(c[index] != 0 && c[index] != 0x10 && c[index] != ' '){
+					float char_width = font->get_char_size(c[index], c[index + 1]).width;
+					if (index && text_size + char_width + begin > p_width) {
+						//We should create a new line here!
+						break; //don't allow lines longer than assigned width
+					}
+
+					text_size += char_width;
+
+					index++;
+				}
+
+				//If there are no chars should we just return?
+				nChars = index;
+
+				//If we can't fit the text in this width, we will need
+				//to backtrack the text_size.
+				//backtrack = text_size;
+				ENSURE_WIDTH(text_size);
+
+				//We need to do this AFTER we have called ENSURE_WIDTH
+				//in case the word is wrapped we will need to resize
+				//the new line, not the old one
+				CHECK_HEIGHT(ascent + furigana_ascent + descent + furigana_descent);
+
+				//Now we can get the word offset here! We need to use this
+				//in the furigana part as the offset
+				float text_pos = wofs;
+
+				if(p_mode == PROCESS_DRAW){
+					float char_offset = wofs;
+					const Color char_color = Color(color);
+					for(index = 0; index < nChars; index++){
+						float char_width = 0.0f;
+
+						char_width = drawer.draw_char(ci, p_ofs + Point2(align_ofs + char_offset, y + lh - descent), c[index], c[index+1], char_color);
+
+						char_offset += char_width;
+					}
+				}
+
+				ADVANCE(text_size);
+
+				// Print the furigana
+				const CharType *f = furi->furigana.c_str();
+				index = 0;
+				float furigana_size = 0.0f;
+				while(f[index] != 0 && f[index] != 0x10 && f[index] != ' '){
+					float char_width = furigana_font->get_char_size(f[index], f[index + 1]).width;
+					furigana_size += char_width;
+					index++;
+				}
+				nChars = index;
+
+				//This offset is calculated as text_size - furigana_size / 2, so we
+				//can know the offset of the furigana over the text. It could be
+				//that the offset is negative, meaning the furigana part will be bigger
+				//than the text and it will overflow on the sides
+				float char_ofs = (text_size - furigana_size) / 2;
+
+				if(p_mode == PROCESS_DRAW){
+					// TODO: Furigana color?
+					const Color char_color = Color(color);
+					for(index = 0; index < nChars; index++){
+						float char_width = 0.0f;
+
+						char_width = furigana_drawer.draw_char(ci, Point2(text_pos + align_ofs + char_ofs, y + lh - (ascent + descent)), f[index], f[index+1], char_color);
+
+						char_ofs += char_width;
+					}
+				}
 			} break;
 			case ITEM_NEWLINE: {
 				lh = 0;
@@ -1938,6 +2052,17 @@ void RichTextLabel::push_table(int p_columns) {
 	_add_item(item, true, true);
 }
 
+void RichTextLabel::push_furigana(String text, String furigana) {
+	//TODO: Make a check to not allow line breaks, tabs and so on
+	ItemFurigana *item = memnew(ItemFurigana);
+
+	item->text = text;
+	item->furigana = furigana;
+	//Flags p_enter and p_ensure_newline set to false because we do not
+	//need for this item to be a parent nor to generate a new line
+	_add_item(item, true);
+}
+
 void RichTextLabel::push_fade(int p_start_index, int p_length) {
 	ItemFade *item = memnew(ItemFade);
 	item->starting_index = p_start_index;
@@ -2115,6 +2240,7 @@ Error RichTextLabel::append_bbcode(const String &p_bbcode) {
 	Ref<Font> italics_font = get_font("italics_font");
 	Ref<Font> bold_italics_font = get_font("bold_italics_font");
 	Ref<Font> mono_font = get_font("mono_font");
+	//Ref<Font> furigana_font = get_font("furigana_font");
 
 	Color base_color = get_color("default_color");
 
@@ -2324,6 +2450,18 @@ Error RichTextLabel::append_bbcode(const String &p_bbcode) {
 
 			pos = end;
 			tag_stack.push_front("img");
+		} else if (tag.begins_with("furigana=")) {
+			String params = tag.substr(9, tag.length());
+			String furigana = params;
+
+			int end = p_bbcode.find("[", brk_end);
+
+			String text = p_bbcode.substr(brk_end + 1, end - brk_end - 1);
+
+			push_furigana(text, furigana);
+
+			pos = end;
+			tag_stack.push_front("furigana");
 		} else if (tag.begins_with("color=")) {
 			String col = tag.substr(6, tag.length());
 			Color color;
@@ -2835,6 +2973,7 @@ void RichTextLabel::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("push_underline"), &RichTextLabel::push_underline);
 	ClassDB::bind_method(D_METHOD("push_strikethrough"), &RichTextLabel::push_strikethrough);
 	ClassDB::bind_method(D_METHOD("push_table", "columns"), &RichTextLabel::push_table);
+	ClassDB::bind_method(D_METHOD("push_furigana", "text", "furigana"), &RichTextLabel::push_furigana);
 	ClassDB::bind_method(D_METHOD("set_table_column_expand", "column", "expand", "ratio"), &RichTextLabel::set_table_column_expand);
 	ClassDB::bind_method(D_METHOD("push_cell"), &RichTextLabel::push_cell);
 	ClassDB::bind_method(D_METHOD("pop"), &RichTextLabel::pop);
@@ -2952,6 +3091,7 @@ void RichTextLabel::_bind_methods() {
 	BIND_ENUM_CONSTANT(ITEM_INDENT);
 	BIND_ENUM_CONSTANT(ITEM_LIST);
 	BIND_ENUM_CONSTANT(ITEM_TABLE);
+	BIND_ENUM_CONSTANT(ITEM_FURIGANA);
 	BIND_ENUM_CONSTANT(ITEM_FADE);
 	BIND_ENUM_CONSTANT(ITEM_SHAKE);
 	BIND_ENUM_CONSTANT(ITEM_WAVE);

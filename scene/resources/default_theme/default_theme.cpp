@@ -857,6 +857,7 @@ void fill_default_theme(Ref<Theme> &theme, const Ref<Font> &default_font, const 
 	theme->set_font("italics_font", "RichTextLabel", default_font);
 	theme->set_font("bold_italics_font", "RichTextLabel", default_font);
 	theme->set_font("mono_font", "RichTextLabel", default_font);
+	theme->set_font("furigana_font", "RichTextLabel", default_font);
 
 	theme->set_color("default_color", "RichTextLabel", Color(1, 1, 1));
 	theme->set_color("font_color_selected", "RichTextLabel", font_color_selection);
